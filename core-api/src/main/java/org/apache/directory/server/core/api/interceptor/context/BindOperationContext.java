@@ -53,6 +53,12 @@ public class BindOperationContext extends AbstractOperationContext
     /** The SASL mechanism */
     private String saslMechanism;
 
+    /** The one-time password, when the SimpleOTP authentication choice is used */
+    private byte[] otpValue;
+
+    /** Tells if this is a SimpleOTP bind */
+    private boolean simpleOtp;
+
     /** The SASL identifier */
     private String saslAuthId;
 
@@ -174,6 +180,42 @@ public class BindOperationContext extends AbstractOperationContext
     public void setSaslAuthId( String saslAuthId )
     {
         this.saslAuthId = saslAuthId;
+    }
+
+
+    /**
+     * @return 	rue if this bind uses the SimpleOTP authentication choice
+     */
+    public boolean isSimpleOtp()
+    {
+        return simpleOtp;
+    }
+
+
+    /**
+     * @param simpleOtp 	rue if this bind uses the SimpleOTP authentication choice
+     */
+    public void setSimpleOtp( boolean simpleOtp )
+    {
+        this.simpleOtp = simpleOtp;
+    }
+
+
+    /**
+     * @return the one-time password presented by the client (may be null)
+     */
+    public byte[] getOtpValue()
+    {
+        return otpValue;
+    }
+
+
+    /**
+     * @param otpValue the one-time password presented by the client
+     */
+    public void setOtpValue( byte[] otpValue )
+    {
+        this.otpValue = otpValue;
     }
 
 

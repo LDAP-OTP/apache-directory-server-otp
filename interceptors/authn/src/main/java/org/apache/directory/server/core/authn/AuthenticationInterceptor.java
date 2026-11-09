@@ -62,6 +62,7 @@ import org.apache.directory.api.ldap.model.entry.Modification;
 import org.apache.directory.api.ldap.model.entry.ModificationOperation;
 import org.apache.directory.api.ldap.model.entry.Value;
 import org.apache.directory.api.ldap.model.exception.LdapAuthenticationException;
+import org.apache.directory.api.ldap.model.exception.LdapAuthenticationNotSupportedException;
 import org.apache.directory.api.ldap.model.exception.LdapException;
 import org.apache.directory.api.ldap.model.exception.LdapNoPermissionException;
 import org.apache.directory.api.ldap.model.exception.LdapOperationException;
@@ -203,6 +204,7 @@ public class AuthenticationInterceptor extends BaseInterceptor
         authenticators.clear();
         authenticators.add( new AnonymousAuthenticator( Dn.ROOT_DSE ) );
         authenticators.add( new SimpleAuthenticator( Dn.ROOT_DSE ) );
+        authenticators.add( new SimpleOtpAuthenticator( Dn.ROOT_DSE ) );
         authenticators.add( new StrongAuthenticator( Dn.ROOT_DSE ) );
     }
 
@@ -418,11 +420,34 @@ public class AuthenticationInterceptor extends BaseInterceptor
     /**
      * Return the selected authenticator given the DN and the level required.
      */
-    private Authenticator selectAuthenticator( Dn bindDn, AuthenticationLevel level )
-        throws LdapUnwillingToPerformException, LdapAuthenticationException
+    private Authenticator selectAuthenticator( Dn bindDn, AuthenticationLevel level, boolean simpleOtp )
+        throws LdapUnwillingToPerformException, LdapAuthenticationException, LdapAuthenticationNotSupportedException
     {
         Authenticator selectedAuthenticator = null;
         Collection<Authenticator> levelAuthenticators = authenticatorsMapByType.get( level );
+
+        // SimpleOTP binds share the SIMPLE level, but are served by dedicated authenticators only,
+        // and plain simple binds must never reach them.
+        if ( levelAuthenticators != null )
+        {
+            Collection<Authenticator> filtered = new ArrayList<>();
+
+            for ( Authenticator candidate : levelAuthenticators )
+            {
+                if ( ( candidate instanceof SimpleOtpAuthenticator ) == simpleOtp )
+                {
+                    filtered.add( candidate );
+                }
+            }
+
+            levelAuthenticators = filtered;
+        }
+
+        if ( simpleOtp && ( ( levelAuthenticators == null ) || levelAuthenticators.isEmpty() ) )
+        {
+            throw new LdapAuthenticationNotSupportedException( ResultCodeEnum.AUTH_METHOD_NOT_SUPPORTED,
+                "The simpleotp authentication method is not supported" );
+        }
 
         if ( ( levelAuthenticators == null ) || levelAuthenticators.isEmpty() )
         {
@@ -564,7 +589,7 @@ public class AuthenticationInterceptor extends BaseInterceptor
         PasswordPolicyResponse pwdRespCtrl = new PasswordPolicyResponseImpl();
         boolean authenticated = false;
 
-        Authenticator authenticator = selectAuthenticator( bindDn, level );
+        Authenticator authenticator = selectAuthenticator( bindDn, level, bindContext.isSimpleOtp() );
 
         try
         {

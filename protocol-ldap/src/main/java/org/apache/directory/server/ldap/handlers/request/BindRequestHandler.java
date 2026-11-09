@@ -29,6 +29,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.directory.api.ldap.model.constants.SchemaConstants;
 import org.apache.directory.api.ldap.model.entry.Entry;
 import org.apache.directory.api.ldap.model.exception.LdapAuthenticationException;
+import org.apache.directory.api.ldap.model.exception.LdapAuthenticationNotSupportedException;
 import org.apache.directory.api.ldap.model.exception.LdapInvalidDnException;
 import org.apache.directory.api.ldap.model.exception.LdapUnwillingToPerformException;
 import org.apache.directory.api.ldap.model.message.BindRequest;
@@ -131,6 +132,8 @@ public class BindRequestHandler extends LdapRequestHandler<BindRequest>
 
         bindContext.setDn( bindRequest.getDn() );
         bindContext.setCredentials( bindRequest.getCredentials() );
+        bindContext.setSimpleOtp( bindRequest.isSimpleOtp() );
+        bindContext.setOtpValue( bindRequest.getOtpValue() );
         bindContext.setIoSession( ldapSession.getIoSession() );
         bindContext.setInterceptors( directoryService.getInterceptors( OperationEnum.BIND ) );
 
@@ -235,7 +238,12 @@ public class BindRequestHandler extends LdapRequestHandler<BindRequest>
             ResultCodeEnum code = null;
             LdapResult result = bindResponse.getLdapResult();
 
-            if ( e instanceof LdapUnwillingToPerformException )
+            if ( e instanceof LdapAuthenticationNotSupportedException )
+            {
+                code = ResultCodeEnum.AUTH_METHOD_NOT_SUPPORTED;
+                result.setResultCode( code );
+            }
+            else if ( e instanceof LdapUnwillingToPerformException )
             {
                 code = ResultCodeEnum.UNWILLING_TO_PERFORM;
                 result.setResultCode( code );
@@ -656,7 +664,7 @@ public class BindRequestHandler extends LdapRequestHandler<BindRequest>
         }
 
         // Deal with the two kinds of authentication : Simple and SASL
-        if ( bindRequest.isSimple() )
+        if ( bindRequest.isSimple() || bindRequest.isSimpleOtp() )
         {
             handleSimpleAuth( ldapSession, bindRequest );
         }
